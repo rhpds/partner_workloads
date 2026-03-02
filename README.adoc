@@ -1,4 +1,4 @@
-= rhpds.pure_workloads
+= rhpds.partner_workloads
 :toc: macro
 :toc-title: Table of Contents
 :toclevels: 3
@@ -6,7 +6,6 @@
 An Ansible collection for deploying Partner Software on Red Hat OpenShift.
 
 toc::[]
-
 
 == License
 
