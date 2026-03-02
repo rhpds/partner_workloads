@@ -1,0 +1,21 @@
+= rhpds.pure_workloads
+:toc: macro
+:toc-title: Table of Contents
+:toclevels: 3
+
+An Ansible collection for deploying Partner Software on Red Hat OpenShift.
+
+toc::[]
+
+
+== License
+
+GPL-2.0-or-later
+
+== Author
+
+Wolfgang Kulhanek <wkulhane@redhat.com>
+
+== Contributing
+
+Issues and pull requests are welcome at the project repository.
