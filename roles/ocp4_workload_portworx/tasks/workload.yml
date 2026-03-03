@@ -141,7 +141,7 @@
     - "{{ ocp4_workload_portworx_namespace }}"
     install_operator_channel: "{{ ocp4_workload_portworx_channel }}"
     install_operator_catalog: "{{ ocp4_workload_portworx_source }}"
-    install_operator_automatic_install_plan_approval: "{{ ocp4_workload_portworx_installplan | default(true) }}"
+    install_operator_automatic_install_plan_approval: "{{ ocp4_workload_portworx_automatic_installplan_approval | default(true) }}"
     install_operator_csv_nameprefix: portworx-operator
     install_operator_starting_csv: "{{ ocp4_workload_portworx_csv }}"
     install_operator_catalogsource_setup: false
