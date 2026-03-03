@@ -16,8 +16,6 @@
   ansible.builtin.debug:
     msg: "VPC ID: {{ vpc_id }}"
 
-- name: abort
-  ansible.builtin.fail:
 - name: Extract VPC ID from the first worker instance
   ansible.builtin.set_fact:
     vpc_id: "{{ r_ec2_info.instances[0].vpc_id }}"
