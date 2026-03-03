@@ -1,8 +1,8 @@
 ---
 - name: Find all EC2 instances with "worker" in their Name tag
   amazon.aws.ec2_instance_info:
-    # filters:
-    #   "tag:Name": "*worker*"
+    filters:
+      "tag:Name": "*worker*"
     region: "{{ aws_region }}"
     aws_access_key: "{{ aws_access_key_id }}"
     aws_secret_key: "{{ aws_secret_access_key }}"
