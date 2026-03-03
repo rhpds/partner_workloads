@@ -8,6 +8,14 @@
     aws_secret_key: "{{ aws_secret_access_key }}"
   register: r_ec2_info
 
+- name: Debug EC2 info
+  ansible.builtin.debug:
+    msg: "EC2 info: {{ r_ec2_info }}"
+
+- name: Debug VPC ID
+  ansible.builtin.debug:
+    msg: "VPC ID: {{ vpc_id }}"
+
 - name: Extract VPC ID from the first worker instance
   ansible.builtin.set_fact:
     vpc_id: "{{ r_ec2_info.instances[0].vpc_id }}"
