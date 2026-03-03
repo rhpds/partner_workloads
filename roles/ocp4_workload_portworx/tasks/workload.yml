@@ -86,18 +86,33 @@
       rule_desc: "{{ ocp4_workload_portworx_namespace }}"
       group_id: "{{ node_sg_id }}"
 
-- name: Set fact for iam worker role from worker instance profile
+- name: Get instance profile name from worker instance
   ansible.builtin.set_fact:
-    _ocp4_workload_portworx_iam_worker_role: >-
+    _ocp4_workload_portworx_instance_profile_name: >-
       {{ r_ec2_info.instances[0].iam_instance_profile.arn.split('/')[-1] }}
 
-- name: Fail if worker IAM role could not be determined
-  ansible.builtin.fail:
-    msg: >-
-      Could not determine worker IAM role. Worker instances must have an
-      IAM instance profile attached. Check that r_ec2_info.instances[0]
-      has iam_instance_profile set.
-  when: _ocp4_workload_portworx_iam_worker_role | length == 0
+- name: Get IAM role from instance profile
+  amazon.aws.iam_instance_profile_info:
+    name: "{{ _ocp4_workload_portworx_instance_profile_name }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+  register: r_iam_instance_profile
+
+- name: Fail if instance profile has no attached role
+  ansible.builtin.assert:
+    that:
+    - r_iam_instance_profile.iam_instance_profiles | length > 0
+    - r_iam_instance_profile.iam_instance_profiles[0].roles | length > 0
+    fail_msg: >-
+      Instance profile {{ _ocp4_workload_portworx_instance_profile_name }}
+      has no attached role. Worker instances must have an IAM instance
+      profile with a role.
+
+- name: Set fact for iam worker role from instance profile
+  ansible.builtin.set_fact:
+    _ocp4_workload_portworx_iam_worker_role: >-
+      {{ r_iam_instance_profile.iam_instance_profiles[0].roles[0].role_name }}
 
 - name: Debug iam worker role
   ansible.builtin.debug:
