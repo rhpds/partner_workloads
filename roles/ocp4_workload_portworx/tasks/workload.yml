@@ -86,21 +86,18 @@
       rule_desc: "{{ ocp4_workload_portworx_namespace }}"
       group_id: "{{ node_sg_id }}"
 
-- name: Find all existing IAM roles
-  amazon.aws.iam_role_info:
-    region: "{{ aws_region }}"
-    aws_access_key: "{{ aws_access_key_id }}"
-    aws_secret_key: "{{ aws_secret_access_key }}"
-  register: r_aws_iam_roles
-
-- name: Extract role names
-  ansible.builtin.set_fact:
-    r_aws_iam_role_names: "{{ r_aws_iam_roles.iam_roles | map(attribute='role_name') | list }}"
-
-- name: Set fact for iam worker role
+- name: Set fact for iam worker role from worker instance profile
   ansible.builtin.set_fact:
     _ocp4_workload_portworx_iam_worker_role: >-
-      {{ r_aws_iam_role_names | regex_search('cluster-[a-z0-9]*-[a-z0-9]*-worker-role') }}
+      {{ r_ec2_info.instances[0].iam_instance_profile.arn.split('/')[-1] }}
+
+- name: Fail if worker IAM role could not be determined
+  ansible.builtin.fail:
+    msg: >-
+      Could not determine worker IAM role. Worker instances must have an
+      IAM instance profile attached. Check that r_ec2_info.instances[0]
+      has iam_instance_profile set.
+  when: _ocp4_workload_portworx_iam_worker_role | length == 0
 
 - name: Debug iam worker role
   ansible.builtin.debug:
