@@ -39,7 +39,7 @@
     msg: "Node Security Group: {{ node_sg_name }}"
 
 - name: Add aws security group rules
-  amazon.aws.ec2_group:
+  amazon.aws.ec2_security_group:
     name: "{{ node_sg_name[0] }}"
     description: "Edited by AgnosticD ocp4_workload_portworx"
     purge_rules: false

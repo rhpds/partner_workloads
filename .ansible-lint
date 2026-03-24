@@ -1,0 +1,9 @@
+---
+profile: production
+
+exclude_paths:
+- tests/
+
+skip_list:
+- var-naming[no-role-prefix]
+- galaxy[no-changelog]
