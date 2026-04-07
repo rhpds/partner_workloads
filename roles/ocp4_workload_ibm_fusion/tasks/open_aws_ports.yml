@@ -1,23 +1,26 @@
 ---
-- name: Get a worker MachineSet
+- name: Get all MachineSets
   kubernetes.core.k8s_info:
     api_version: machine.openshift.io/v1beta1
     kind: MachineSet
     namespace: openshift-machine-api
-    label_selectors:
-    - machine.openshift.io/cluster-api-machine-role=worker
   register: r_machineset
+
+- name: Select worker MachineSets
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_worker_machinesets: >-
+      {{ r_machineset.resources | selectattr('metadata.name', 'search', 'worker') | list }}
 
 - name: Fail if no worker MachineSet found
   ansible.builtin.assert:
     that:
-    - r_machineset.resources | length > 0
+    - _ocp4_workload_ibm_fusion_worker_machinesets | length > 0
     fail_msg: No worker MachineSet found in openshift-machine-api namespace
 
 - name: Extract security group filters from MachineSet providerSpec
   ansible.builtin.set_fact:
     _ocp4_workload_ibm_fusion_sg_filters: >-
-      {{ r_machineset.resources[0].spec.template.spec.providerSpec.value.securityGroups }}
+      {{ _ocp4_workload_ibm_fusion_worker_machinesets[0].spec.template.spec.providerSpec.value.securityGroups }}
 
 - name: Build security group filter name from MachineSet
   ansible.builtin.set_fact:
