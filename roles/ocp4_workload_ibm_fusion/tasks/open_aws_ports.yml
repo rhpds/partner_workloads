@@ -1,0 +1,71 @@
+---
+- name: Find all EC2 instances with "worker" in their Name tag
+  amazon.aws.ec2_instance_info:
+    filters:
+      "tag:Name": "*worker*"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+  register: r_ec2_info
+
+- name: Extract VPC ID from the first worker instance
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_vpc_id: "{{ r_ec2_info.instances[0].vpc_id }}"
+
+- name: Get VPC CIDR block
+  amazon.aws.ec2_vpc_net_info:
+    vpc_ids:
+    - "{{ _ocp4_workload_ibm_fusion_vpc_id }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+  register: r_vpc_info
+
+- name: Extract VPC CIDR
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_vpc_cidr: "{{ r_vpc_info.vpcs[0].cidr_block }}"
+
+- name: Extract worker security group info
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_worker_sg: >-
+      {{ r_ec2_info.instances | map(attribute='security_groups') |
+         flatten | selectattr('group_name', 'search', 'worker') | unique | list }}
+
+- name: Debug security group and VPC info
+  ansible.builtin.debug:
+    msg: >-
+      Worker SG: {{ _ocp4_workload_ibm_fusion_worker_sg[0].group_name }}
+      ({{ _ocp4_workload_ibm_fusion_worker_sg[0].group_id }}),
+      VPC CIDR: {{ _ocp4_workload_ibm_fusion_vpc_cidr }}
+
+- name: Add AWS security group rules for IBM Spectrum Scale
+  amazon.aws.ec2_security_group:
+    name: "{{ _ocp4_workload_ibm_fusion_worker_sg[0].group_name }}"
+    description: "Edited by AgnosticD ocp4_workload_ibm_fusion"
+    purge_rules: false
+    state: present
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_region }}"
+    vpc_id: "{{ _ocp4_workload_ibm_fusion_vpc_id }}"
+    rules:
+    # SSH admin port 12345 (Scale operator management)
+    - proto: tcp
+      ports: 12345
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-ssh-admin
+    # GPFS daemon port 1191 TCP
+    - proto: tcp
+      ports: 1191
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-daemon
+    # GPFS daemon port 1191 UDP
+    - proto: udp
+      ports: 1191
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-daemon-udp
+    # tscCmdPortRange 60000-61000 (Scale inter-node communication)
+    - proto: tcp
+      ports: 60000-61000
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-tsc-range

@@ -5,6 +5,9 @@
 - name: Prepare worker nodes
   ansible.builtin.include_tasks: prepare_worker_nodes.yml
 
+- name: Open AWS security group ports for Scale
+  ansible.builtin.include_tasks: open_aws_ports.yml
+
 - name: Install IBM Storage Fusion operator
   ansible.builtin.include_role:
     name: install_operator
