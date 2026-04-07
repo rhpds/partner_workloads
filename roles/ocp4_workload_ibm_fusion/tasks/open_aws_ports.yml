@@ -1,0 +1,106 @@
+---
+- name: Get all MachineSets
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+  register: r_machineset
+
+- name: Select worker MachineSets
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_worker_machinesets: >-
+      {{ r_machineset.resources | selectattr('metadata.name', 'search', 'worker') | list }}
+
+- name: Fail if no worker MachineSet found
+  ansible.builtin.assert:
+    that:
+    - _ocp4_workload_ibm_fusion_worker_machinesets | length > 0
+    fail_msg: No worker MachineSet found in openshift-machine-api namespace
+
+- name: Extract security group filters from MachineSet providerSpec
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_sg_filters: >-
+      {{ _ocp4_workload_ibm_fusion_worker_machinesets[0].spec.template.spec.providerSpec.value.securityGroups }}
+
+- name: Build security group filter name from MachineSet
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_sg_tag_name: >-
+      {{ _ocp4_workload_ibm_fusion_sg_filters
+         | map(attribute='filters', default=[])
+         | flatten
+         | selectattr('name', 'equalto', 'tag:Name')
+         | map(attribute='values')
+         | flatten
+         | first }}
+
+- name: Find worker security group
+  amazon.aws.ec2_security_group_info:
+    filters:
+      "tag:Name": "{{ _ocp4_workload_ibm_fusion_sg_tag_name }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+  register: r_worker_sg
+
+- name: Fail if worker security group not found
+  ansible.builtin.assert:
+    that:
+    - r_worker_sg.security_groups | length > 0
+    fail_msg: >-
+      Could not find worker security group with tag Name:
+      {{ _ocp4_workload_ibm_fusion_sg_tag_name }}
+
+- name: Get VPC CIDR block
+  amazon.aws.ec2_vpc_net_info:
+    vpc_ids:
+    - "{{ r_worker_sg.security_groups[0].vpc_id }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+  register: r_vpc_info
+
+- name: Set worker SG and VPC facts
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_worker_sg_name: "{{ r_worker_sg.security_groups[0].group_name }}"
+    _ocp4_workload_ibm_fusion_worker_sg_id: "{{ r_worker_sg.security_groups[0].group_id }}"
+    _ocp4_workload_ibm_fusion_vpc_id: "{{ r_worker_sg.security_groups[0].vpc_id }}"
+    _ocp4_workload_ibm_fusion_vpc_cidr: "{{ r_vpc_info.vpcs[0].cidr_block }}"
+
+- name: Debug security group and VPC info
+  ansible.builtin.debug:
+    msg: >-
+      Worker SG: {{ _ocp4_workload_ibm_fusion_worker_sg_name }}
+      ({{ _ocp4_workload_ibm_fusion_worker_sg_id }}),
+      VPC CIDR: {{ _ocp4_workload_ibm_fusion_vpc_cidr }}
+
+- name: Add AWS security group rules for IBM Spectrum Scale
+  amazon.aws.ec2_security_group:
+    name: "{{ _ocp4_workload_ibm_fusion_worker_sg_name }}"
+    description: "Edited by AgnosticD ocp4_workload_ibm_fusion"
+    purge_rules: false
+    state: present
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_region }}"
+    vpc_id: "{{ _ocp4_workload_ibm_fusion_vpc_id }}"
+    rules:
+    # SSH admin port 12345 (Scale operator management)
+    - proto: tcp
+      ports: 12345
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-ssh-admin
+    # GPFS daemon port 1191 TCP
+    - proto: tcp
+      ports: 1191
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-daemon
+    # GPFS daemon port 1191 UDP
+    - proto: udp
+      ports: 1191
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-daemon-udp
+    # tscCmdPortRange 60000-61000 (Scale inter-node communication)
+    - proto: tcp
+      ports: 60000-61000
+      cidr_ip: "{{ _ocp4_workload_ibm_fusion_vpc_cidr }}"
+      rule_desc: scale-tsc-range

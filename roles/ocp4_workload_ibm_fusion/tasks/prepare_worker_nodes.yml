@@ -29,9 +29,6 @@
     kind: Node
     name: "{{ worker_node }}"
     definition:
-      apiVersion: v1
-      kind: Node
-      name: "{{ worker_node }}"
       metadata:
         labels:
           cluster.ocs.openshift.io/openshift-storage: ''
