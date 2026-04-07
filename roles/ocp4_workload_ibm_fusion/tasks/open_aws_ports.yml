@@ -1,19 +1,39 @@
 ---
-- name: Get cluster infrastructure ID
+- name: Get a worker MachineSet
   kubernetes.core.k8s_info:
-    api_version: config.openshift.io/v1
-    kind: Infrastructure
-    name: cluster
-  register: r_infra
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+    label_selectors:
+    - machine.openshift.io/cluster-api-machine-role=worker
+  register: r_machineset
 
-- name: Set infrastructure ID
+- name: Fail if no worker MachineSet found
+  ansible.builtin.assert:
+    that:
+    - r_machineset.resources | length > 0
+    fail_msg: No worker MachineSet found in openshift-machine-api namespace
+
+- name: Extract security group filters from MachineSet providerSpec
   ansible.builtin.set_fact:
-    _ocp4_workload_ibm_fusion_infra_id: "{{ r_infra.resources[0].status.infrastructureName }}"
+    _ocp4_workload_ibm_fusion_sg_filters: >-
+      {{ r_machineset.resources[0].spec.template.spec.providerSpec.value.securityGroups }}
 
-- name: Find worker security group by infrastructure tag
+- name: Build security group filter name from MachineSet
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_sg_tag_name: >-
+      {{ _ocp4_workload_ibm_fusion_sg_filters
+         | map(attribute='filters', default=[])
+         | flatten
+         | selectattr('name', 'equalto', 'tag:Name')
+         | map(attribute='values')
+         | flatten
+         | first }}
+
+- name: Find worker security group
   amazon.aws.ec2_security_group_info:
     filters:
-      "tag:Name": "{{ _ocp4_workload_ibm_fusion_infra_id }}-worker-sg"
+      "tag:Name": "{{ _ocp4_workload_ibm_fusion_sg_tag_name }}"
     region: "{{ aws_region }}"
     aws_access_key: "{{ aws_access_key_id }}"
     aws_secret_key: "{{ aws_secret_access_key }}"
@@ -25,7 +45,7 @@
     - r_worker_sg.security_groups | length > 0
     fail_msg: >-
       Could not find worker security group with tag Name:
-      {{ _ocp4_workload_ibm_fusion_infra_id }}-worker-sg
+      {{ _ocp4_workload_ibm_fusion_sg_tag_name }}
 
 - name: Get VPC CIDR block
   amazon.aws.ec2_vpc_net_info:
