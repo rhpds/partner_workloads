@@ -1,46 +1,58 @@
 ---
-- name: Find all EC2 instances with "worker" in their Name tag
-  amazon.aws.ec2_instance_info:
+- name: Get cluster infrastructure ID
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Infrastructure
+    name: cluster
+  register: r_infra
+
+- name: Set infrastructure ID
+  ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_infra_id: "{{ r_infra.resources[0].status.infrastructureName }}"
+
+- name: Find worker security group by infrastructure tag
+  amazon.aws.ec2_security_group_info:
     filters:
-      "tag:Name": "*worker*"
+      "tag:Name": "{{ _ocp4_workload_ibm_fusion_infra_id }}-worker-sg"
     region: "{{ aws_region }}"
     aws_access_key: "{{ aws_access_key_id }}"
     aws_secret_key: "{{ aws_secret_access_key }}"
-  register: r_ec2_info
+  register: r_worker_sg
 
-- name: Extract VPC ID from the first worker instance
-  ansible.builtin.set_fact:
-    _ocp4_workload_ibm_fusion_vpc_id: "{{ r_ec2_info.instances[0].vpc_id }}"
+- name: Fail if worker security group not found
+  ansible.builtin.assert:
+    that:
+    - r_worker_sg.security_groups | length > 0
+    fail_msg: >-
+      Could not find worker security group with tag Name:
+      {{ _ocp4_workload_ibm_fusion_infra_id }}-worker-sg
 
 - name: Get VPC CIDR block
   amazon.aws.ec2_vpc_net_info:
     vpc_ids:
-    - "{{ _ocp4_workload_ibm_fusion_vpc_id }}"
+    - "{{ r_worker_sg.security_groups[0].vpc_id }}"
     region: "{{ aws_region }}"
     aws_access_key: "{{ aws_access_key_id }}"
     aws_secret_key: "{{ aws_secret_access_key }}"
   register: r_vpc_info
 
-- name: Extract VPC CIDR
+- name: Set worker SG and VPC facts
   ansible.builtin.set_fact:
+    _ocp4_workload_ibm_fusion_worker_sg_name: "{{ r_worker_sg.security_groups[0].group_name }}"
+    _ocp4_workload_ibm_fusion_worker_sg_id: "{{ r_worker_sg.security_groups[0].group_id }}"
+    _ocp4_workload_ibm_fusion_vpc_id: "{{ r_worker_sg.security_groups[0].vpc_id }}"
     _ocp4_workload_ibm_fusion_vpc_cidr: "{{ r_vpc_info.vpcs[0].cidr_block }}"
-
-- name: Extract worker security group info
-  ansible.builtin.set_fact:
-    _ocp4_workload_ibm_fusion_worker_sg: >-
-      {{ r_ec2_info.instances | map(attribute='security_groups') |
-         flatten | selectattr('group_name', 'search', 'worker') | unique | list }}
 
 - name: Debug security group and VPC info
   ansible.builtin.debug:
     msg: >-
-      Worker SG: {{ _ocp4_workload_ibm_fusion_worker_sg[0].group_name }}
-      ({{ _ocp4_workload_ibm_fusion_worker_sg[0].group_id }}),
+      Worker SG: {{ _ocp4_workload_ibm_fusion_worker_sg_name }}
+      ({{ _ocp4_workload_ibm_fusion_worker_sg_id }}),
       VPC CIDR: {{ _ocp4_workload_ibm_fusion_vpc_cidr }}
 
 - name: Add AWS security group rules for IBM Spectrum Scale
   amazon.aws.ec2_security_group:
-    name: "{{ _ocp4_workload_ibm_fusion_worker_sg[0].group_name }}"
+    name: "{{ _ocp4_workload_ibm_fusion_worker_sg_name }}"
     description: "Edited by AgnosticD ocp4_workload_ibm_fusion"
     purge_rules: false
     state: present
