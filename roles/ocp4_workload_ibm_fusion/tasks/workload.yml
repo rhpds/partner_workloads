@@ -19,13 +19,32 @@
     - ibm-spectrum-fusion-ns
     install_operator_channel: "{{ ocp4_workload_ibm_fusion_channel }}"
     install_operator_catalog: ibm-operator-catalog
-    install_operator_automatic_install_plan_approval: "{{ ocp4_workload_ibm_fusion_installplan_approval | bool }}"
+    # Always set to false because IBM Fusion does not support automatic updates
+    install_operator_automatic_install_plan_approval: false
     install_operator_starting_csv: "{{ ocp4_workload_ibm_fusion_starting_csv }}"
     install_operator_catalogsource_setup: true
     install_operator_catalogsource_name: ibm-operator-catalog
     install_operator_catalogsource_namespace: openshift-marketplace
     install_operator_catalogsource_image: icr.io/cpopen/ibm-operator-catalog
     install_operator_catalogsource_image_tag: "{{ ocp4_workload_ibm_fusion_catalog_source_tag }}"
+
+- name: Brief pause before checking Fusion namespace pods
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Wait until all pods in ibm-spectrum-fusion-ns are Running
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: ibm-spectrum-fusion-ns
+  register: r_fusion_namespace_pods
+  until:
+  - r_fusion_namespace_pods.resources | length > 0
+  - r_fusion_namespace_pods.resources | selectattr('status', 'defined') | selectattr('status.phase', 'defined') | list | length
+    == r_fusion_namespace_pods.resources | length
+  - r_fusion_namespace_pods.resources | map(attribute='status.phase') | list | difference(['Running', 'Succeeded']) | length == 0
+  retries: 300
+  delay: 10
 
 - name: Deploy SpectrumFusion (and accept the license)
   kubernetes.core.k8s:

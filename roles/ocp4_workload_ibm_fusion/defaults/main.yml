@@ -2,14 +2,12 @@
 # -----------------------------------
 # IBM Storage Fusion operator
 # -----------------------------------
+# OpenShift 4.20 is the latest supported version for IBM Fusion 2.12.x
+
 ocp4_workload_ibm_fusion_catalog_source_tag: latest
 ocp4_workload_ibm_fusion_channel: "v2.0"
 ocp4_workload_ibm_fusion_starting_csv: ""
-#  ocp4_workload_ibm_fusion_starting_csv: "v2.12.0"
-# OpenShift 4.20 is the latest supported version for IBM Fusion 2.12.0
-
-# This MUST be false for IBM Fusion
-ocp4_workload_ibm_fusion_installplan_approval: false
+#  ocp4_workload_ibm_fusion_starting_csv: "v2.12.1"
 
 # The entitlement key needs to come from a vault, include, etc.
 ocp4_workload_ibm_fusion_entitlement_key: ""
@@ -23,7 +21,6 @@ ocp4_workload_ibm_fusion_deploy_global_data_platform: false
 ocp4_workload_ibm_fusion_storage_class: gp3-csi
 ocp4_workload_ibm_fusion_storage_size: 512Gi
 ocp4_workload_ibm_fusion_storage_cluster_deploy_timeout: 1800
-# ocp4_workload_ibm_fusion_storage_system_deploy_timeout: 600
 
 # --------------------------------
 # Storage classes
