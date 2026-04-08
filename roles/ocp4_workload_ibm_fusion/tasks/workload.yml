@@ -55,6 +55,33 @@
   delay: 10
   until: r_spectrumfusion is success
 
+- name: Wait for CatalogSource ibm-usage-metering-catalog-source to be ready
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: CatalogSource
+    name: ibm-usage-metering-catalog-source
+    namespace: openshift-marketplace
+  register: r_usage_metering_catalog
+  until:
+  - r_usage_metering_catalog.resources is defined
+  - r_usage_metering_catalog.resources | length > 0
+  - r_usage_metering_catalog.resources[0].status is defined
+  - r_usage_metering_catalog.resources[0].status.connectionState is defined
+  - r_usage_metering_catalog.resources[0].status.connectionState.lastObservedState == "READY"
+  retries: 30
+  delay: 10
+  ignore_errors: true
+
+- name: Delete isf-prereq-operator controller manager pod if CatalogSource not ready
+  when: r_usage_metering_catalog is failed
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Pod
+    namespace: ibm-spectrum-fusion-ns
+    label_selectors:
+    - control-plane=isf-prereq-operator-controller-manager
+
 # This takes about 20 minutes to fully deploy (with GlobalDataPlatform enabled)
 - name: Wait for SpectrumFusion to be fully deployed
   kubernetes.core.k8s_info:
