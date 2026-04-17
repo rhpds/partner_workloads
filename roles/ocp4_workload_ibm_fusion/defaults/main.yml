@@ -12,6 +12,12 @@ ocp4_workload_ibm_fusion_starting_csv: ""
 # The entitlement key needs to come from a vault, include, etc.
 ocp4_workload_ibm_fusion_entitlement_key: ""
 
+# Open AWS security group ports for Scale
+# This does NOT work if the role is deployed to a cluster from a pool
+# because the sandbox AWS credentials are not sufficient to open the ports.
+# When opening ports this role must run as part of the cluster installation.
+ocp4_workload_ibm_fusion_open_aws_ports: false
+
 # Enable Global Data Platform
 ocp4_workload_ibm_fusion_deploy_global_data_platform: false
 
