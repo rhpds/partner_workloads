@@ -81,20 +81,6 @@
     wait_sleep: 10
     wait_timeout: "{{ ocp4_workload_ibm_fusion_storage_cluster_deploy_timeout }}"
 
-# - name: Wait for Storage System to finish deploying
-#   kubernetes.core.k8s_info:
-#     api_version: ocs.openshift.io/v1
-#     kind: StorageSystem
-#     name: ocs-storagecluster-storagesystem
-#     namespace: openshift-storage
-#     wait: true
-#     wait_condition:
-#       reason: ReconcileCompleted
-#       status: "True"
-#       type: Available
-#     wait_sleep: 10
-#     wait_timeout: "{{ ocp4_workload_ibm_fusion_storage_system_deploy_timeout }}"
-
 - name: Update default storage class
   when: ocp4_workload_ibm_fusion_update_default_storage_class | bool
   block:
